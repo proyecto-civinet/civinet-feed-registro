@@ -1,7 +1,12 @@
+require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 
-const supabaseUrl = 'https://geilroobnavmcalhkore.supabase.co';
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdlaWxyb29ibmF2bWNhbGhrb3Jl';
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_KEY;
+
+if (!supabaseUrl || !supabaseKey) {
+  throw new Error('Faltan SUPABASE_URL o SUPABASE_KEY en el archivo .env');
+}
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 

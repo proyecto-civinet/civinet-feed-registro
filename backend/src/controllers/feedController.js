@@ -1,9 +1,7 @@
-const pool = require("../config/db");
+const supabase = require('../supabaseClient');
 
 // ─────────────────────────────────────────────
 // GET /api/feed
-// Obtener feed paginado (con filtro opcional por tipo)
-// Ejemplo: /api/feed?pagina=1&limite=10&tipo=urgente
 // ─────────────────────────────────────────────
 exports.obtenerFeed = async (req, res) => {
   const pagina = parseInt(req.query.pagina) || 1;
@@ -12,324 +10,304 @@ exports.obtenerFeed = async (req, res) => {
   const tipo   = req.query.tipo || null;
 
   try {
-    const countResult = await pool.query(
-      tipo
-        ? `SELECT COUNT(*) FROM publicaciones WHERE tipo = $1`
-        : `SELECT COUNT(*) FROM publicaciones`,
-      tipo ? [tipo] : []
-    );
-    const total = parseInt(countResult.rows[0].count);
+    let countQuery = supabase.from('publicaciones').select('id', { count: 'exact', head: true });
+    if (tipo) countQuery = countQuery.eq('tipo', tipo);
+    const { count: total, error: countError } = await countQuery;
+    if (countError) throw countError;
 
-    const params = tipo ? [limite, offset, tipo] : [limite, offset];
-    const resultado = await pool.query(
-      `SELECT
-         p.id,
-         p.titulo,
-         p.descripcion,
-         p.imagen_url,
-         p.fecha_creacion,
-         p.tipo,
-         o.id   AS ong_id,
-         o.nombre AS ong_nombre,
-         m.monto_objetivo,
-         m.monto_actual,
-         ROUND((m.monto_actual / m.monto_objetivo) * 100, 2) AS porcentaje,
-         (SELECT COUNT(*) FROM likes_publicacion lp WHERE lp.publicacion_id = p.id) AS total_likes,
-         (SELECT COUNT(*) FROM comentarios c WHERE c.publicacion_id = p.id) AS total_comentarios
-       FROM publicaciones p
-       JOIN ongs o ON p.ong_id = o.id
-       JOIN metas m ON p.meta_id = m.id
-       ${tipo ? "WHERE p.tipo = $3" : ""}
-       ORDER BY p.fecha_creacion DESC
-       LIMIT $1 OFFSET $2`,
-      params
-    );
+    let query = supabase
+      .from('publicaciones')
+      .select(`
+        id, titulo, descripcion, imagen_url, fecha_creacion, tipo,
+        ongs ( id, nombre ),
+        metas ( monto_objetivo, monto_actual ),
+        likes_publicacion ( id ),
+        comentarios ( id )
+      `)
+      .order('fecha_creacion', { ascending: false })
+      .range(offset, offset + limite - 1);
 
-    res.json({
-      pagina,
-      limite,
-      total,
-      totalPaginas: Math.ceil(total / limite),
-      publicaciones: resultado.rows,
-    });
+    if (tipo) query = query.eq('tipo', tipo);
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    const publicaciones = data.map(p => ({
+      id: p.id,
+      titulo: p.titulo,
+      descripcion: p.descripcion,
+      imagen_url: p.imagen_url,
+      fecha_creacion: p.fecha_creacion,
+      tipo: p.tipo,
+      ong_id: p.ongs?.id,
+      ong_nombre: p.ongs?.nombre,
+      monto_objetivo: p.metas?.monto_objetivo,
+      monto_actual: p.metas?.monto_actual,
+      porcentaje: p.metas?.monto_objetivo
+        ? Math.round((p.metas.monto_actual / p.metas.monto_objetivo) * 10000) / 100
+        : 0,
+      total_likes: p.likes_publicacion?.length || 0,
+      total_comentarios: p.comentarios?.length || 0,
+    }));
+
+    res.json({ pagina, limite, total, totalPaginas: Math.ceil(total / limite), publicaciones });
   } catch (error) {
-    console.error("Error obtenerFeed:", error);
-    res.status(500).json({ mensaje: "Error al obtener el feed" });
+    console.error('Error obtenerFeed:', error);
+    res.status(500).json({ mensaje: 'Error al obtener el feed' });
   }
 };
 
 // ─────────────────────────────────────────────
 // GET /api/feed/recaudaciones
-// Ver el estado de recaudación de todas las ONGs
 // ─────────────────────────────────────────────
 exports.obtenerRecaudaciones = async (req, res) => {
   try {
-    const resultado = await pool.query(`
-      SELECT
-        o.id AS ong_id,
-        o.nombre AS ong_nombre,
-        m.id AS meta_id,
-        m.monto_objetivo,
-        m.monto_actual,
-        ROUND((m.monto_actual / m.monto_objetivo) * 100, 2) AS porcentaje
-      FROM metas m
-      JOIN ongs o ON m.ong_id = o.id
-      ORDER BY porcentaje DESC
-    `);
-    res.json(resultado.rows);
+    const { data, error } = await supabase
+      .from('metas')
+      .select('id, monto_objetivo, monto_actual, ongs ( id, nombre )')
+      .order('monto_actual', { ascending: false });
+
+    if (error) throw error;
+
+    const resultado = data.map(m => ({
+      ong_id: m.ongs?.id,
+      ong_nombre: m.ongs?.nombre,
+      meta_id: m.id,
+      monto_objetivo: m.monto_objetivo,
+      monto_actual: m.monto_actual,
+      porcentaje: m.monto_objetivo
+        ? Math.round((m.monto_actual / m.monto_objetivo) * 10000) / 100
+        : 0,
+    }));
+
+    res.json(resultado);
   } catch (error) {
-    console.error("Error obtenerRecaudaciones:", error);
-    res.status(500).json({ mensaje: "Error al obtener recaudaciones" });
+    console.error('Error obtenerRecaudaciones:', error);
+    res.status(500).json({ mensaje: 'Error al obtener recaudaciones' });
   }
 };
 
 // ─────────────────────────────────────────────
 // POST /api/feed
-// Crear nueva publicación (solo ONGs)
-// Body: { ong_id, meta_id, titulo, descripcion, imagen_url, tipo }
 // ─────────────────────────────────────────────
 exports.crearPublicacion = async (req, res) => {
   const { ong_id, meta_id, titulo, descripcion, imagen_url, tipo } = req.body;
 
   if (!ong_id || !meta_id || !titulo || !descripcion) {
-    return res.status(400).json({
-      mensaje: "Faltan campos obligatorios: ong_id, meta_id, titulo, descripcion",
-    });
+    return res.status(400).json({ mensaje: 'Faltan campos obligatorios: ong_id, meta_id, titulo, descripcion' });
   }
 
-  const tiposValidos = ["actualizacion", "recaudacion", "urgente"];
-  const tipoFinal = tiposValidos.includes(tipo) ? tipo : "actualizacion";
+  const tiposValidos = ['actualizacion', 'recaudacion', 'urgente'];
+  const tipoFinal = tiposValidos.includes(tipo) ? tipo : 'actualizacion';
 
   try {
-    const nueva = await pool.query(
-      `INSERT INTO publicaciones (ong_id, meta_id, titulo, descripcion, imagen_url, tipo)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [ong_id, meta_id, titulo, descripcion, imagen_url || null, tipoFinal]
-    );
+    const { data: publicacion, error } = await supabase
+      .from('publicaciones')
+      .insert([{ ong_id, meta_id, titulo, descripcion, imagen_url: imagen_url || null, tipo: tipoFinal }])
+      .select()
+      .single();
 
-    const publicacion = nueva.rows[0];
+    if (error) throw error;
 
-    // Notificar suscriptores
-    const suscriptores = await pool.query(
-      `SELECT usuario_id FROM suscripciones_feed WHERE ong_id = $1 AND activa = TRUE`,
-      [ong_id]
-    );
+    const { data: suscriptores, error: suscError } = await supabase
+      .from('suscripciones_feed')
+      .select('usuario_id')
+      .eq('ong_id', ong_id)
+      .eq('activa', true);
 
-    if (suscriptores.rows.length > 0) {
-      const valores = suscriptores.rows.map(
-        (s) => `(${s.usuario_id}, ${publicacion.id}, 'Nueva publicación: ${titulo.replace(/'/g, "''")}', FALSE, NOW())`
-      );
-      await pool.query(
-        `INSERT INTO notificaciones_feed (usuario_id, publicacion_id, mensaje, leida, fecha)
-         VALUES ${valores.join(", ")}`
-      );
-      console.log(`[Notificación] Enviada a ${suscriptores.rows.length} suscriptores`);
+    if (suscError) throw suscError;
+
+    if (suscriptores.length > 0) {
+      const notificaciones = suscriptores.map(s => ({
+        usuario_id: s.usuario_id,
+        publicacion_id: publicacion.id,
+        mensaje: `Nueva publicación: ${titulo}`,
+        leida: false,
+      }));
+      const { error: notifError } = await supabase.from('notificaciones_feed').insert(notificaciones);
+      if (notifError) throw notifError;
     }
 
     res.status(201).json({
-      mensaje: "Publicación creada exitosamente",
+      mensaje: 'Publicación creada exitosamente',
       publicacion,
-      suscriptoresNotificados: suscriptores.rows.length,
+      suscriptoresNotificados: suscriptores.length,
     });
   } catch (error) {
-    console.error("Error crearPublicacion:", error);
-    res.status(500).json({ mensaje: "Error al crear la publicación" });
+    console.error('Error crearPublicacion:', error);
+    res.status(500).json({ mensaje: 'Error al crear la publicación' });
   }
 };
 
 // ─────────────────────────────────────────────
 // POST /api/feed/:id/like
-// Dar like a una publicación
-// Body: { usuario_id }
 // ─────────────────────────────────────────────
 exports.darLike = async (req, res) => {
   const { id } = req.params;
   const { usuario_id } = req.body;
 
-  if (!usuario_id) {
-    return res.status(400).json({ mensaje: "Se requiere usuario_id" });
-  }
+  if (!usuario_id) return res.status(400).json({ mensaje: 'Se requiere usuario_id' });
 
   try {
-    await pool.query(
-      `INSERT INTO likes_publicacion (publicacion_id, usuario_id)
-       VALUES ($1, $2)
-       ON CONFLICT (publicacion_id, usuario_id) DO NOTHING`,
-      [id, usuario_id]
-    );
+    await supabase
+      .from('likes_publicacion')
+      .upsert([{ publicacion_id: parseInt(id), usuario_id }], { onConflict: 'publicacion_id,usuario_id', ignoreDuplicates: true });
 
-    const total = await pool.query(
-      `SELECT COUNT(*) FROM likes_publicacion WHERE publicacion_id = $1`,
-      [id]
-    );
+    const { count, error } = await supabase
+      .from('likes_publicacion')
+      .select('id', { count: 'exact', head: true })
+      .eq('publicacion_id', id);
 
-    res.json({
-      mensaje: "Like registrado",
-      total_likes: parseInt(total.rows[0].count),
-    });
+    if (error) throw error;
+
+    res.json({ mensaje: 'Like registrado', total_likes: count });
   } catch (error) {
-    console.error("Error darLike:", error);
-    res.status(500).json({ mensaje: "Error al dar like" });
+    console.error('Error darLike:', error);
+    res.status(500).json({ mensaje: 'Error al dar like' });
   }
 };
 
 // ─────────────────────────────────────────────
 // POST /api/feed/:id/comentario
-// Agregar comentario a una publicación
-// Body: { usuario_id, comentario }
 // ─────────────────────────────────────────────
 exports.comentar = async (req, res) => {
   const { id } = req.params;
   const { usuario_id, comentario } = req.body;
 
-  if (!usuario_id || !comentario) {
-    return res.status(400).json({ mensaje: "Se requieren usuario_id y comentario" });
-  }
+  if (!usuario_id || !comentario) return res.status(400).json({ mensaje: 'Se requieren usuario_id y comentario' });
 
   try {
-    const nuevo = await pool.query(
-      `INSERT INTO comentarios (publicacion_id, usuario_id, comentario)
-       VALUES ($1, $2, $3) RETURNING *`,
-      [id, usuario_id, comentario]
-    );
+    const { data, error } = await supabase
+      .from('comentarios')
+      .insert([{ publicacion_id: parseInt(id), usuario_id, comentario }])
+      .select()
+      .single();
 
-    res.status(201).json({
-      mensaje: "Comentario agregado",
-      comentario: nuevo.rows[0],
-    });
+    if (error) throw error;
+
+    res.status(201).json({ mensaje: 'Comentario agregado', comentario: data });
   } catch (error) {
-    console.error("Error comentar:", error);
-    res.status(500).json({ mensaje: "Error al agregar comentario" });
+    console.error('Error comentar:', error);
+    res.status(500).json({ mensaje: 'Error al agregar comentario' });
   }
 };
 
 // ─────────────────────────────────────────────
 // GET /api/feed/:id/comentarios
-// Ver todos los comentarios de una publicación
 // ─────────────────────────────────────────────
 exports.verComentarios = async (req, res) => {
   const { id } = req.params;
 
   try {
-    const resultado = await pool.query(
-      `SELECT
-         c.id,
-         c.usuario_id,
-         c.comentario,
-         c.fecha
-       FROM comentarios c
-       WHERE c.publicacion_id = $1
-       ORDER BY c.fecha ASC`,
-      [id]
-    );
+    const { data, error } = await supabase
+      .from('comentarios')
+      .select('id, usuario_id, comentario, fecha')
+      .eq('publicacion_id', id)
+      .order('fecha', { ascending: true });
 
-    res.json({
-      publicacion_id: parseInt(id),
-      total: resultado.rows.length,
-      comentarios: resultado.rows,
-    });
+    if (error) throw error;
+
+    res.json({ publicacion_id: parseInt(id), total: data.length, comentarios: data });
   } catch (error) {
-    console.error("Error verComentarios:", error);
-    res.status(500).json({ mensaje: "Error al obtener comentarios" });
+    console.error('Error verComentarios:', error);
+    res.status(500).json({ mensaje: 'Error al obtener comentarios' });
   }
 };
 
 // ─────────────────────────────────────────────
 // POST /api/feed/suscribir
-// Suscribirse a notificaciones de una ONG
-// Body: { usuario_id, ong_id }
 // ─────────────────────────────────────────────
 exports.suscribirse = async (req, res) => {
   const { usuario_id, ong_id } = req.body;
 
-  if (!usuario_id || !ong_id) {
-    return res.status(400).json({ mensaje: "Se requieren usuario_id y ong_id" });
-  }
+  if (!usuario_id || !ong_id) return res.status(400).json({ mensaje: 'Se requieren usuario_id y ong_id' });
 
   try {
-    await pool.query(
-      `INSERT INTO suscripciones_feed (usuario_id, ong_id, activa)
-       VALUES ($1, $2, TRUE)
-       ON CONFLICT (usuario_id, ong_id) DO UPDATE SET activa = TRUE`,
-      [usuario_id, ong_id]
-    );
+    const { error } = await supabase
+      .from('suscripciones_feed')
+      .upsert([{ usuario_id, ong_id, activa: true }], { onConflict: 'usuario_id,ong_id' });
+
+    if (error) throw error;
+
     res.json({ mensaje: `Suscrito correctamente a notificaciones de la ONG ${ong_id}` });
   } catch (error) {
-    console.error("Error suscribirse:", error);
-    res.status(500).json({ mensaje: "Error al suscribirse" });
+    console.error('Error suscribirse:', error);
+    res.status(500).json({ mensaje: 'Error al suscribirse' });
   }
 };
 
 // ─────────────────────────────────────────────
 // DELETE /api/feed/suscribir
-// Cancelar suscripción a notificaciones
-// Body: { usuario_id, ong_id }
 // ─────────────────────────────────────────────
 exports.cancelarSuscripcion = async (req, res) => {
   const { usuario_id, ong_id } = req.body;
 
-  if (!usuario_id || !ong_id) {
-    return res.status(400).json({ mensaje: "Se requieren usuario_id y ong_id" });
-  }
+  if (!usuario_id || !ong_id) return res.status(400).json({ mensaje: 'Se requieren usuario_id y ong_id' });
 
   try {
-    await pool.query(
-      `UPDATE suscripciones_feed SET activa = FALSE
-       WHERE usuario_id = $1 AND ong_id = $2`,
-      [usuario_id, ong_id]
-    );
-    res.json({ mensaje: "Suscripción cancelada correctamente" });
+    const { error } = await supabase
+      .from('suscripciones_feed')
+      .update({ activa: false })
+      .eq('usuario_id', usuario_id)
+      .eq('ong_id', ong_id);
+
+    if (error) throw error;
+
+    res.json({ mensaje: 'Suscripción cancelada correctamente' });
   } catch (error) {
-    console.error("Error cancelarSuscripcion:", error);
-    res.status(500).json({ mensaje: "Error al cancelar suscripción" });
+    console.error('Error cancelarSuscripcion:', error);
+    res.status(500).json({ mensaje: 'Error al cancelar suscripción' });
   }
 };
 
 // ─────────────────────────────────────────────
 // GET /api/feed/notificaciones/:usuario_id
-// Ver notificaciones de un usuario
 // ─────────────────────────────────────────────
 exports.obtenerNotificaciones = async (req, res) => {
   const { usuario_id } = req.params;
 
   try {
-    const resultado = await pool.query(
-      `SELECT
-         n.id,
-         n.mensaje,
-         n.leida,
-         n.fecha,
-         p.titulo AS publicacion_titulo,
-         p.tipo   AS publicacion_tipo
-       FROM notificaciones_feed n
-       JOIN publicaciones p ON n.publicacion_id = p.id
-       WHERE n.usuario_id = $1
-       ORDER BY n.fecha DESC`,
-      [usuario_id]
-    );
-    res.json(resultado.rows);
+    const { data, error } = await supabase
+      .from('notificaciones_feed')
+      .select('id, mensaje, leida, fecha, publicaciones ( titulo, tipo )')
+      .eq('usuario_id', usuario_id)
+      .order('fecha', { ascending: false });
+
+    if (error) throw error;
+
+    const resultado = data.map(n => ({
+      id: n.id,
+      mensaje: n.mensaje,
+      leida: n.leida,
+      fecha: n.fecha,
+      publicacion_titulo: n.publicaciones?.titulo,
+      publicacion_tipo: n.publicaciones?.tipo,
+    }));
+
+    res.json(resultado);
   } catch (error) {
-    console.error("Error obtenerNotificaciones:", error);
-    res.status(500).json({ mensaje: "Error al obtener notificaciones" });
+    console.error('Error obtenerNotificaciones:', error);
+    res.status(500).json({ mensaje: 'Error al obtener notificaciones' });
   }
 };
 
 // ─────────────────────────────────────────────
 // PATCH /api/feed/notificaciones/:notificacion_id/leer
-// Marcar una notificación como leída
 // ─────────────────────────────────────────────
 exports.marcarLeida = async (req, res) => {
   const { notificacion_id } = req.params;
 
   try {
-    await pool.query(
-      `UPDATE notificaciones_feed SET leida = TRUE WHERE id = $1`,
-      [notificacion_id]
-    );
-    res.json({ mensaje: "Notificación marcada como leída" });
+    const { error } = await supabase
+      .from('notificaciones_feed')
+      .update({ leida: true })
+      .eq('id', notificacion_id);
+
+    if (error) throw error;
+
+    res.json({ mensaje: 'Notificación marcada como leída' });
   } catch (error) {
-    console.error("Error marcarLeida:", error);
-    res.status(500).json({ mensaje: "Error al marcar notificación" });
+    console.error('Error marcarLeida:', error);
+    res.status(500).json({ mensaje: 'Error al marcar notificación' });
   }
 };
-

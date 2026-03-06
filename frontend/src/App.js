@@ -1,0 +1,288 @@
+import React, { useState, useEffect } from "react";
+import "./App.css";
+
+function App() {
+  const [publicaciones, setPublicaciones] = useState([]);
+  const [busqueda, setBusqueda] = useState("");
+  const [menuAbierto, setMenuAbierto] = useState(false);
+  const [publicacionSeleccionada, setPublicacionSeleccionada] = useState(null);
+  const [comentarios, setComentarios] = useState({});
+  const [comentariosAbiertos, setComentariosAbiertos] = useState([]);
+  const [likesDados, setLikesDados] = useState([]);
+  const [comentariosDetalle, setComentariosDetalle] = useState([]);
+
+  useEffect(() => {
+    obtenerFeed();
+  }, []);
+
+  useEffect(() => {
+    if (publicacionSeleccionada) {
+      obtenerComentarios(publicacionSeleccionada.id);
+    }
+  }, [publicacionSeleccionada]);
+
+  const obtenerFeed = async () => {
+    try {
+      const res = await fetch("http://localhost:4000/api/feed");
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        setPublicaciones(data);
+      } else if (data.publicaciones) {
+        setPublicaciones(data.publicaciones);
+      } else {
+        setPublicaciones([]);
+      }
+    } catch (error) {
+      console.error("Error al obtener feed:", error);
+    }
+  };
+
+  const obtenerComentarios = async (id) => {
+    try {
+      const res = await fetch(`http://localhost:4000/api/feed/${id}/comentarios`);
+      const data = await res.json();
+      setComentariosDetalle(data.comentarios || []);
+    } catch (error) {
+      console.error("Error al obtener comentarios:", error);
+    }
+  };
+
+  const darLike = async (id) => {
+    if (likesDados.includes(id)) {
+      setLikesDados(likesDados.filter(l => l !== id));
+      setPublicaciones(prev =>
+        prev.map(pub =>
+          pub.id === id
+            ? { ...pub, total_likes: String(Number(pub.total_likes) - 1) }
+            : pub
+        )
+      );
+      return;
+    }
+    try {
+      await fetch(`http://localhost:4000/api/feed/${id}/like`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ usuario_id: 1 })
+      });
+      setLikesDados([...likesDados, id]);
+      setPublicaciones(prev =>
+        prev.map(pub =>
+          pub.id === id
+            ? { ...pub, total_likes: String(Number(pub.total_likes) + 1) }
+            : pub
+        )
+      );
+    } catch (error) {
+      console.error("Error al dar like:", error);
+    }
+  };
+
+  const toggleComentarios = (id) => {
+    if (comentariosAbiertos.includes(id)) {
+      setComentariosAbiertos(comentariosAbiertos.filter(c => c !== id));
+    } else {
+      setComentariosAbiertos([...comentariosAbiertos, id]);
+    }
+  };
+
+  const comentar = async (id) => {
+    const texto = comentarios[id];
+    if (!texto) return;
+    try {
+      await fetch(`http://localhost:4000/api/feed/${id}/comentario`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ usuario_id: 1, comentario: texto })
+      });
+      setComentarios({ ...comentarios, [id]: "" });
+      setPublicaciones(prev =>
+        prev.map(pub =>
+          pub.id === id
+            ? { ...pub, total_comentarios: String(Number(pub.total_comentarios) + 1) }
+            : pub
+        )
+      );
+      obtenerComentarios(id);
+    } catch (error) {
+      console.error("Error al comentar:", error);
+    }
+  };
+
+  const publicacionesFiltradas = publicaciones.filter((pub) =>
+    pub.ong_nombre?.toLowerCase().includes(busqueda.toLowerCase()) ||
+    pub.titulo?.toLowerCase().includes(busqueda.toLowerCase())
+  );
+
+  // PANTALLA DETALLE
+  if (publicacionSeleccionada) {
+    const pub = publicacionSeleccionada;
+    return (
+      <div className="detalle">
+        <button className="btn-volver" onClick={() => { setPublicacionSeleccionada(null); setComentariosDetalle([]); }}>
+          ← Volver
+        </button>
+        {pub.imagen_url && (
+          <img src={pub.imagen_url} alt={pub.titulo} className="detalle-img" />
+        )}
+        <div className="detalle-body">
+          <span className="ong-tag">{pub.ong_nombre}</span>
+          <h2>{pub.titulo}</h2>
+          <p>{pub.descripcion}</p>
+
+          <div className="detalle-meta">
+            <div className="barra-container">
+              <div
+                className={`barra ${Number(pub.porcentaje) >= 50 ? "alta" : "baja"}`}
+                style={{ width: `${pub.porcentaje}%` }}
+              ></div>
+            </div>
+            <span className={`meta-texto ${Number(pub.porcentaje) >= 50 ? "alta" : "baja"}`}>
+              ${Number(pub.monto_actual).toLocaleString()} de ${Number(pub.monto_objetivo).toLocaleString()} — {pub.porcentaje}%
+            </span>
+          </div>
+
+          <div className="detalle-acciones">
+            <button
+              className={`btn-like ${likesDados.includes(pub.id) ? "liked" : ""}`}
+              onClick={() => darLike(pub.id)}
+            >
+              {likesDados.includes(pub.id) ? "❤️" : "🤍"} {pub.total_likes} Me gusta
+            </button>
+            <span>💬 {pub.total_comentarios} comentarios</span>
+          </div>
+
+          <div className="detalle-comentar">
+            <input
+              type="text"
+              placeholder="Escribe un comentario..."
+              value={comentarios[pub.id] || ""}
+              onChange={(e) => setComentarios({ ...comentarios, [pub.id]: e.target.value })}
+            />
+            <button onClick={() => comentar(pub.id)}>Publicar</button>
+          </div>
+
+          <div className="lista-comentarios">
+            {comentariosDetalle.length === 0 ? (
+              <p className="sin-comentarios">No hay comentarios aún. ¡Sé el primero!</p>
+            ) : (
+              comentariosDetalle.map((c) => (
+                <div className="comentario-item" key={c.id}>
+                  <div className="comentario-avatar">U</div>
+                  <div className="comentario-contenido">
+                    <span className="comentario-usuario">Usuario {c.usuario_id}</span>
+                    <p className="comentario-texto">{c.comentario}</p>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // PANTALLA PRINCIPAL
+  return (
+    <>
+      <nav className="navbar">
+        <div className="navbar-logo">
+          <img src="/logo2.jpeg" alt="CiviNet" style={{height: '50px', objectFit: 'contain', mixBlendMode: 'multiply'}} />
+        </div>
+        <div className="navbar-menu" onClick={() => setMenuAbierto(!menuAbierto)}>
+          ☰ Menú
+        </div>
+        <div style={{flex: 1}}></div>
+        <div className="navbar-search">
+          <input
+            type="text"
+            placeholder="Busca ONG o publicación..."
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+          />
+        </div>
+        <div className="navbar-avatar">MS</div>
+      </nav>
+
+      {menuAbierto && (
+        <div className="menu-desplegable">
+          <ul>
+            <li onClick={() => setMenuAbierto(false)}>Inicio</li>
+            <li onClick={() => setMenuAbierto(false)}>Donaciones</li>
+            <li onClick={() => setMenuAbierto(false)}>ONGs</li>
+            <li onClick={() => setMenuAbierto(false)}>Voluntarios</li>
+            <li onClick={() => setMenuAbierto(false)}>Mi perfil</li>
+          </ul>
+        </div>
+      )}
+
+      <div className="app">
+        <h2 className="seccion-titulo">Publicaciones disponibles:</h2>
+        <div className="feed">
+          {publicacionesFiltradas.map((pub, index) => (
+           <div className="card" key={pub.id}>
+              {pub.imagen_url ? (
+                <img src={pub.imagen_url} alt={pub.titulo} />
+              ) : (
+                <div className="card-placeholder"></div>
+              )}
+              <div className="card-body">
+                <h3>{pub.ong_nombre}</h3>
+                <div className="card-autor">{pub.titulo}</div>
+                <div className="card-direccion">
+                  {pub.descripcion?.substring(0, 50)}...
+                </div>
+
+                <div className="barra-container">
+                  <div
+                    className={`barra ${Number(pub.porcentaje) >= 50 ? "alta" : "baja"}`}
+                    style={{ width: `${pub.porcentaje}%` }}
+                  ></div>
+                </div>
+                <div className={`meta-texto ${Number(pub.porcentaje) >= 50 ? "alta" : "baja"}`}>
+                  {pub.porcentaje}% recaudado
+                </div>
+
+                <div className="card-footer">
+                  <button
+                    className="btn-conoce"
+                    onClick={() => setPublicacionSeleccionada(pub)}
+                  >
+                    Conoce más →
+                  </button>
+                  <div className="likes">
+                    <button
+                      onClick={() => darLike(pub.id)}
+                      className={likesDados.includes(pub.id) ? "liked" : ""}
+                    >
+                      {likesDados.includes(pub.id) ? "❤️" : "🤍"}
+                    </button>
+                    {pub.total_likes}
+                  </div>
+                </div>
+
+                <div className="comentarios-toggle" onClick={() => toggleComentarios(pub.id)}>
+                  💬 {pub.total_comentarios} comentarios {comentariosAbiertos.includes(pub.id) ? "▲" : "▼"}
+                </div>
+
+                {comentariosAbiertos.includes(pub.id) && (
+                  <div className="comentar-seccion">
+                    <input
+                      type="text"
+                      placeholder="Escribe un comentario..."
+                      value={comentarios[pub.id] || ""}
+                      onChange={(e) => setComentarios({ ...comentarios, [pub.id]: e.target.value })}
+                    />
+                    <button onClick={() => comentar(pub.id)}>Publicar</button>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </>
+  );
+}
+
+export default App;

@@ -19,7 +19,8 @@ exports.obtenerFeed = async (req, res) => {
         ongs ( id, nombre ),
         metas ( monto_objetivo, monto_actual ),
         likes_publicacion ( id ),
-        comentarios ( id )
+        comentarios ( id ),
+        imagenes_publicacion ( id, imagen_url, orden )
       `)
       .order('fecha_creacion', { ascending: false })
       .range(offset, offset + limite - 1);
@@ -29,35 +30,27 @@ exports.obtenerFeed = async (req, res) => {
     const { data, error } = await query;
     if (error) throw error;
 
-    const publicaciones = data.map(p => {
-      const meta = Array.isArray(p.metas) ? p.metas[0] : p.metas;
+    const publicaciones = data.map(p => ({
+      id: p.id,
+      titulo: p.titulo,
+      descripcion: p.descripcion,
+      imagen_url: p.imagen_url,
+      imagenes: p.imagenes_publicacion?.sort((a, b) => a.orden - b.orden).map(i => i.imagen_url) || [],
+      fecha_creacion: p.fecha_creacion,
+      tipo: p.tipo,
+      categoria: p.categoria,
+      ong_id: p.ongs?.id,
+      ong_nombre: p.ongs?.nombre,
+      monto_objetivo: p.metas?.monto_objetivo,
+      monto_actual: p.metas?.monto_actual,
+      porcentaje: p.metas?.monto_objetivo
+        ? Math.round((p.metas.monto_actual / p.metas.monto_objetivo) * 10000) / 100
+        : 0,
+      total_likes: p.likes_publicacion?.length || 0,
+      total_comentarios: p.comentarios?.length || 0,
+    }));
 
-      return {
-        id: p.id,
-        titulo: p.titulo,
-        descripcion: p.descripcion,
-        imagen_url: p.imagen_url,
-        fecha_creacion: p.fecha_creacion,
-        tipo: p.tipo,
-        categoria: p.categoria,
-        ong_id: p.ongs?.id,
-        ong_nombre: p.ongs?.nombre,
-        monto_objetivo: meta?.monto_objetivo ?? 0,
-        monto_actual: meta?.monto_actual ?? 0,
-        porcentaje: meta?.monto_objetivo
-          ? Math.round((meta.monto_actual / meta.monto_objetivo) * 10000) / 100
-          : 0,
-        total_likes: p.likes_publicacion?.length || 0,
-        total_comentarios: p.comentarios?.length || 0,
-      };
-    });
-
-    // Elimina duplicados por id por si acaso
-    const sinDuplicados = publicaciones.filter(
-      (pub, index, self) => index === self.findIndex(p => p.id === pub.id)
-    );
-
-    res.json({ pagina, limite, total, totalPaginas: Math.ceil(total / limite), publicaciones: sinDuplicados });
+    res.json({ pagina, limite, total, totalPaginas: Math.ceil(total / limite), publicaciones });
   } catch (error) {
     console.error('Error obtenerFeed:', error);
     res.status(500).json({ mensaje: 'Error al obtener el feed' });
@@ -183,6 +176,32 @@ exports.comentar = async (req, res) => {
   }
 };
 
+exports.borrarComentario = async (req, res) => {
+  console.log("🔥 borrarComentario llamado", req.params, req.body);
+  const { comid } = req.params;
+  const { usuario_id, publicacion_id } = req.body;
+
+  if (!usuario_id) return res.status(400).json({ mensaje: 'Se requiere usuario_id' });
+
+  try {
+    const { data, error } = await supabase
+      .from('comentarios')
+      .delete()
+      .eq('id', comid)
+      .eq('usuario_id', usuario_id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    if (!data) return res.status(403).json({ mensaje: 'No tienes permiso para borrar este comentario' });
+
+    res.json({ mensaje: 'Comentario eliminado' });
+  } catch (error) {
+    console.error('Error borrarComentario:', error);
+    res.status(500).json({ mensaje: 'Error al borrar el comentario' });
+  }
+};
+
 exports.verComentarios = async (req, res) => {
   const { id } = req.params;
 
@@ -287,3 +306,6 @@ exports.marcarLeida = async (req, res) => {
     res.status(500).json({ mensaje: 'Error al marcar notificación' });
   }
 };
+
+
+

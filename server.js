@@ -4,4 +4,3 @@ pool.query("SELECT NOW()") .then(res  => console.log("✅ Conectado a PostgreSQL
 
 Guarda y vuelve a ejecutar:
 ```
-node server.js

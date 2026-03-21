@@ -1,8 +1,8 @@
 ﻿import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
-  'https://geilroobnavmcalhkore.supabase.co',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdlaWxyb29ibmF2bWNhbGhrb3JlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxMDYxOTksImV4cCI6MjA4NzY4MjE5OX0.3EBX0QWlpDvg9Ig4-a0cXRTelk9R0fI3YTPbv1SzRAs'
+  'https://wzjtteeyaluvbznhdfwl.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind6anR0ZWV5YWx1dmJ6bmhkZndsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxMDY4MjUsImV4cCI6MjA4NzY4MjgyNX0.jFitbRXUFrZ66PlHTlAMG-mYnSMI18VknxnvNJyFQFs'
 );
 
 export default supabase;

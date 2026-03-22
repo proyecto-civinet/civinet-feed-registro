@@ -7,6 +7,31 @@ import LoginReg from "./pages2/Login";
 
 const CATEGORIAS = ["Todos", "Ayuda Social", "Educación", "Medio Ambiente", "Animales", "Deporte"];
 
+// ── TOAST ─────────────────────────────────────────────────────────────────────
+function Toast({ mensaje, tipo, visible }) {
+  if (!visible) return null;
+  const colores = {
+    exito:  { bg: '#2DBBC4', icon: '✓' },
+    error:  { bg: '#e74c3c', icon: '✕' },
+    info:   { bg: '#555',    icon: 'ℹ' },
+  };
+  const c = colores[tipo] || colores.info;
+  return (
+    <div style={{
+      position: 'fixed', bottom: '2rem', left: '50%', transform: 'translateX(-50%)',
+      background: c.bg, color: 'white', padding: '0.8rem 1.5rem',
+      borderRadius: '30px', fontWeight: 600, fontSize: '0.95rem',
+      boxShadow: '0 8px 24px rgba(0,0,0,0.2)', zIndex: 9999,
+      display: 'flex', alignItems: 'center', gap: '0.6rem',
+      animation: 'fadeInUp 0.3s ease',
+      whiteSpace: 'nowrap'
+    }}>
+      <span style={{ fontSize: '1.1rem' }}>{c.icon}</span>
+      {mensaje}
+    </div>
+  );
+}
+
 function NavbarRegistro({ setPage, usuario, onLogout }) {
   return (
     <nav style={{
@@ -128,7 +153,13 @@ function App() {
   const [categoriaActiva, setCategoriaActiva]                 = useState("Todos");
   const [modalDonar, setModalDonar]                           = useState(false);
   const [montoDonar, setMontoDonar]                           = useState('');
+  const [toast, setToast]                                     = useState({ visible: false, mensaje: '', tipo: 'exito' });
   const perfilRef = useRef(null);
+
+  const mostrarToast = (mensaje, tipo = 'exito') => {
+    setToast({ visible: true, mensaje, tipo });
+    setTimeout(() => setToast(t => ({ ...t, visible: false })), 3000);
+  };
 
   useEffect(() => {
     const guardado = localStorage.getItem('civinet_usuario');
@@ -294,7 +325,7 @@ function App() {
               </div>
               <div style={{ display: 'flex', gap: '0.8rem', margin: '1rem 0' }}>
                 <button onClick={() => setModalDonar(true)} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #2DBBC4, #1a9aa3)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 700, fontSize: '0.95rem', cursor: 'pointer' }}>Donar</button>
-                <button onClick={() => { navigator.clipboard.writeText(window.location.href); alert('¡Enlace copiado!'); }} style={{ flex: 1, padding: '0.75rem', background: 'white', color: '#2DBBC4', border: '2px solid #2DBBC4', borderRadius: '10px', fontWeight: 700, fontSize: '0.95rem', cursor: 'pointer' }}>Compartir</button>
+                <button onClick={() => { navigator.clipboard.writeText(window.location.href); mostrarToast('¡Enlace copiado al portapapeles!', 'info'); }} style={{ flex: 1, padding: '0.75rem', background: 'white', color: '#2DBBC4', border: '2px solid #2DBBC4', borderRadius: '10px', fontWeight: 700, fontSize: '0.95rem', cursor: 'pointer' }}>Compartir</button>
               </div>
               {modalDonar && (() => {
                 const tipo = pub.tipo_donacion || 'otro';
@@ -323,7 +354,7 @@ function App() {
                       </div>
                       <div style={{ display: 'flex', gap: '0.8rem' }}>
                         <button onClick={() => { setModalDonar(false); setMontoDonar(''); }} style={{ flex: 1, padding: '0.6rem', borderRadius: '25px', border: '2px solid #ccc', background: 'white', color: '#888', fontWeight: 600, cursor: 'pointer' }}>Cancelar</button>
-                        <button onClick={() => { if (!montoDonar) return alert('Por favor completa el campo'); alert(`Gracias!\n${tipo === 'monetaria' ? `Monto: $${Number(montoDonar).toLocaleString()}` : `Donacion: ${montoDonar}`}`); setModalDonar(false); setMontoDonar(''); }} style={{ flex: 1, padding: '0.6rem', borderRadius: '25px', background: 'linear-gradient(135deg, #2DBBC4, #1a9aa3)', color: 'white', border: 'none', fontWeight: 700, cursor: 'pointer' }}>Donar</button>
+                        <button onClick={() => { if (!montoDonar) return mostrarToast('Por favor completa el campo', 'error'); mostrarToast(`¡Gracias por tu donación! ${tipo === 'monetaria' ? `Monto: $${Number(montoDonar).toLocaleString()}` : `Donación: ${montoDonar}`}`, 'exito'); setModalDonar(false); setMontoDonar(''); }} style={{ flex: 1, padding: '0.6rem', borderRadius: '25px', background: 'linear-gradient(135deg, #2DBBC4, #1a9aa3)', color: 'white', border: 'none', fontWeight: 700, cursor: 'pointer' }}>Donar</button>
                       </div>
                     </div>
                   </div>
@@ -365,6 +396,7 @@ function App() {
           </div>
         </div>
         <Footer />
+        <Toast mensaje={toast.mensaje} tipo={toast.tipo} visible={toast.visible} />
       </div>
     );
   }

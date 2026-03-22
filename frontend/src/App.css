@@ -5,7 +5,7 @@ body { background-color: #f5f5f5;
 }
 
 /* NAVBAR */
-.navbar { background: linear-gradient(135deg, #5bc8d4, #4ab8c8); padding: 14px 30px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 8px rgba(0,0,0,0.15); gap: 16px;
+.navbar { background: linear-gradient(135deg, #5bc8d4, #4ab8c8); padding: 14px 30px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 8px rgba(0,0,0,0.15); gap: 16px; position: sticky; top: 0; z-index: 1000;
 }
 
 .navbar-logo { display: flex; align-items: center; gap: 10px; color: white; font-size: 22px; font-weight: 700;
@@ -17,7 +17,7 @@ body { background-color: #f5f5f5;
 .navbar-search { display: flex; align-items: center; background: white; border-radius: 40px; padding: 8px 20px; gap: 10px;
 }
 
-.navbar-search input { border: none; outline: none; font-size: 14px; width: 200px; color: #333;
+.navbar-search input { border: none; outline: none; font-size: 14px; width: 160px; color: #333;
 }
 
 .navbar-avatar { width: 42px; height: 42px; border-radius: 50%; background: linear-gradient(135deg, #cdc7ba, #b5b0aa); border: 3px solid white; display: flex; align-items: center; justify-content: center; color: rgb(10, 10, 10); font-weight: 700; font-size: 14px;
@@ -37,7 +37,7 @@ body { background-color: #f5f5f5;
 }
 
 /* CONTENIDO */
-.app { max-width: 1100px; margin: 30px auto; padding: 0 20px;
+.app { max-width: 1100px; margin: 30px auto; padding: 0 20px; width: 100%;
 }
 
 .seccion-titulo { font-size: 20px; font-weight: 700; color: #333; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #5bc8d4;
@@ -205,7 +205,7 @@ body { background-color: #f5f5f5;
 }
 
 /* FILTROS DE CATEGORÍA */
-.filtros { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 28px; padding: 16px 0;
+.filtros { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 28px; padding: 16px 0; justify-content: center;
 }
 
 .filtro-btn { padding: 10px 22px; border-radius: 50px; border: 2px solid #e0e0e0; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.25s ease; background: white; color: #555; box-shadow: 0 2px 6px rgba(0,0,0,0.06);
@@ -213,190 +213,80 @@ body { background-color: #f5f5f5;
 
 .filtro-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.12);
 }
-    
+
 /* CARRUSEL */
-.carrusel {
-  position: relative;
-  width: 100%;
-  height: 420px;
-  overflow: hidden;
-  cursor: pointer;
+.carrusel { position: relative; width: 100%; height: 420px; overflow: hidden; cursor: pointer;
 }
 
-.carrusel-slide {
-  width: 100%;
-  height: 100%;
-  position: relative;
+.carrusel-slide { width: 100%; height: 100%; position: relative;
 }
 
-.carrusel-img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-  transition: opacity 0.5s ease;
+.carrusel-img { width: 100%; height: 100%; object-fit: cover; display: block; transition: opacity 0.5s ease;
 }
 
-.carrusel-overlay {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: linear-gradient(transparent, rgba(0,0,0,0.85));
-  padding: 30px 40px;
-  color: white;
+.carrusel-overlay { position: absolute; bottom: 0; left: 0; right: 0; background: linear-gradient(transparent, rgba(0,0,0,0.85)); padding: 30px 40px; color: white;
 }
 
-.carrusel-badge {
-  background: #ef4444;
-  color: white;
-  padding: 4px 12px;
-  border-radius: 20px;
-  font-size: 12px;
-  font-weight: 700;
-  display: inline-block;
-  margin-bottom: 10px;
+.carrusel-badge { background: #ef4444; color: white; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; display: inline-block; margin-bottom: 10px;
 }
 
-.carrusel-titulo {
-  font-size: 26px;
-  font-weight: 800;
-  margin-bottom: 6px;
-  text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+.carrusel-titulo { font-size: 26px; font-weight: 800; margin-bottom: 6px; text-shadow: 0 2px 4px rgba(0,0,0,0.5);
 }
 
-.carrusel-ong {
-  font-size: 14px;
-  color: #5bc8d4;
-  font-weight: 600;
-  margin-bottom: 6px;
+.carrusel-ong { font-size: 14px; color: #5bc8d4; font-weight: 600; margin-bottom: 6px;
 }
 
-.carrusel-desc {
-  font-size: 14px;
-  color: rgba(255,255,255,0.85);
-  margin-bottom: 14px;
-  line-height: 1.5;
+.carrusel-desc { font-size: 14px; color: rgba(255,255,255,0.85); margin-bottom: 14px; line-height: 1.5;
 }
 
-.carrusel-btn {
-  background: #5bc8d4;
-  color: white;
-  border: none;
-  padding: 10px 24px;
-  border-radius: 24px;
-  font-size: 14px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: background 0.2s;
+.carrusel-btn { background: #5bc8d4; color: white; border: none; padding: 10px 24px; border-radius: 24px; font-size: 14px; font-weight: 700; cursor: pointer; transition: background 0.2s;
 }
 
-.carrusel-btn:hover {
-  background: #4ab8c8;
+.carrusel-btn:hover { background: #4ab8c8;
 }
 
-.carrusel-arrow {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  background: rgba(255,255,255,0.2);
-  border: none;
-  color: white;
-  font-size: 40px;
-  width: 50px;
-  height: 50px;
-  border-radius: 50%;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 0.2s;
-  z-index: 10;
+.carrusel-arrow { position: absolute; top: 50%; transform: translateY(-50%); background: rgba(255,255,255,0.2); border: none; color: white; font-size: 40px; width: 50px; height: 50px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.2s; z-index: 10;
 }
 
-.carrusel-arrow:hover {
-  background: rgba(255,255,255,0.4);
+.carrusel-arrow:hover { background: rgba(255,255,255,0.4);
 }
 
 .carrusel-arrow.left { left: 16px; }
 .carrusel-arrow.right { right: 16px; }
 
-.carrusel-dots {
-  position: absolute;
-  bottom: 16px;
-  right: 40px;
-  display: flex;
-  gap: 8px;
-  z-index: 10;
+.carrusel-dots { position: absolute; bottom: 16px; right: 40px; display: flex; gap: 8px; z-index: 10;
 }
 
-.carrusel-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: rgba(255,255,255,0.5);
-  cursor: pointer;
-  transition: background 0.2s;
+.carrusel-dot { width: 10px; height: 10px; border-radius: 50%; background: rgba(255,255,255,0.5); cursor: pointer; transition: background 0.2s;
 }
 
-.carrusel-dot.activo {
-  background: white;
+.carrusel-dot.activo { background: white;
 }
 
 /* CARRUSEL EN CARDS */
-.card-img-wrapper {
-  position: relative;
-  overflow: hidden;
+.card-img-wrapper { position: relative; overflow: hidden;
 }
 
-.card-img-wrapper img {
-  width: 100%;
-  height: 200px;
-  object-fit: cover;
-  display: block;
+.card-img-wrapper img { width: 100%; height: 200px; object-fit: cover; display: block;
 }
 
-.card-arrow {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  background: rgba(0,0,0,0.4);
-  border: none;
-  color: white;
-  font-size: 24px;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 5;
-  transition: background 0.2s;
+.card-arrow { position: absolute; top: 50%; transform: translateY(-50%); background: rgba(0,0,0,0.4); border: none; color: white; font-size: 24px; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 5; transition: background 0.2s;
 }
 
 .card-arrow:hover { background: rgba(0,0,0,0.7); }
 .card-arrow.left { left: 8px; }
 .card-arrow.right { right: 8px; }
 
-.card-img-dots {
-  position: absolute;
-  bottom: 8px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  gap: 5px;
+.card-img-dots { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); display: flex; gap: 5px;
 }
 
-.card-img-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: rgba(255,255,255,0.5);
-  cursor: pointer;
-  transition: background 0.2s;
+.card-img-dot { width: 7px; height: 7px; border-radius: 50%; background: rgba(255,255,255,0.5); cursor: pointer; transition: background 0.2s;
 }
 
 .card-img-dot.activo { background: white; }
+
+/* FILTRO ACTIVO */
+.filtro-btn.activo { background: #5bc8d4; color: white; border-color: #5bc8d4; box-shadow: 0 4px 12px rgba(91,200,212,0.35);
+}
 
 
